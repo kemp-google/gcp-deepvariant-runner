@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Locally builds the docker container and runs tests.
+#
+# The test sets to run (gpu, cpu, tpu) can be specified as arguments.  By
+# default all tests are executed.
+
+PROJECT_ID="$(gcloud config get-value project)"
+if [ -z "${PROJECT_ID}" ]; then
+  echo "You must set a project ID with `gcloud config set`"
+  exit 1
+fi
+
+MODEL="gs://deepvariant/models/DeepVariant/0.7.2/DeepVariant-inception_v3-0.7.2+data-wgs_standard"
+IMAGE="gcr.io/${PROJECT_ID}/gcp-deepvariant-docker:HEAD"
+
+docker build -t "${IMAGE}" .
+docker push "${IMAGE}"
+
+for profile in ${@:-cpu gpu tpu}; do
+  echo "Running ${profile} tests"
+  docker run -v "${HOME}/.config:/root/.config" \
+      "${IMAGE}" \
+      /opt/deepvariant_runner/bin/run_and_verify.sh \
+      "${PROJECT_ID}" HEAD "${MODEL}" "${profile}"
+done
